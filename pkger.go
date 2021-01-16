@@ -1,11 +1,14 @@
 package packago
 
 import (
-	"github.com/legenove/utils"
+	"encoding/base64"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/legenove/utils"
 )
 
 var ignore = map[string]bool{
@@ -67,6 +70,7 @@ func PackagerAllFile(dirpath string, out string, goPkg string) error {
 	}
 	files, _ := GetDirAllFile(dirpath)
 	var err error
+	pkgList := map[string]bool{}
 	for _, f := range files {
 		goPkgName := path.Join(goPkg, out, "tamplates", f.SubDir)
 		if strings.HasSuffix(goPkgName, "/") {
@@ -95,30 +99,72 @@ func PackagerAllFile(dirpath string, out string, goPkg string) error {
 		if err != nil {
 			return err
 		}
-		dataStr := string(data)
-		dataStr = strings.Replace(dataStr, "`", BackQuota, -1)
+		var dataStr string
+		var isBase64 bool
+		if IsText(data) {
+			dataStr = strings.Replace(string(data), "`", BackQuota, -1)
+			isBase64 = false
+		} else {
+			dataStr = base64.StdEncoding.EncodeToString(data)
+			isBase64 = true
+		}
 		err = utils.WriteDataTo(outFileFullPath, utils.FormatTplByMap(tlpFileTlp, map[string]interface{}{
 			"package":     pkgName,
 			"fileVarName": GetVarName(f.Name),
 			"fileSubPath": f.SubPath,
 			"strData":     dataStr,
+			"base64":      isBase64,
 		}))
 		if err != nil {
 			return err
 		}
+		pkgList[goPkgName] = true
 	}
+	err = utils.WriteDataTo(path.Join(outPath, "unpackage.go"), utils.FormatTplByMap(tlpGenTlp, map[string]interface{}{
+		"pkgList": pkgList,
+	}))
+
 	return nil
 }
 
 var tlpFileTlp = `package {{.package}}
 
 import (
-	"github.com/legenove/packager"
+	"github.com/legenove/packago"
 )
 
 func init() {
-	packager.FileList[{{.fileVarName}}FileName] = {{.fileVarName}}Tlp
+	packago.FileList[{{.fileVarName}}FileName] = &packago.FileGenInfo{
+		Content : {{.fileVarName}}Tlp,
+		Overide : false,
+		Example : false,
+		Base64  : {{.base64}},
+	}
 }
 
 var {{.fileVarName}}FileName = "{{.fileSubPath}}"
 var {{.fileVarName}}Tlp = ` + "`" + `{{.strData}}` + "`"
+
+var tlpGenTlp = `package packagoGen
+
+import (
+	{{ range $key, $value := .pkgList -}}
+	_ "{{$key}}"
+	{{ end }}
+	"github.com/legenove/packago"
+)
+
+func Unpackage(outPath string, kv map[string]interface{}, first bool) error {
+	return packago.Unpackage(outPath, kv, first)
+}
+`
+
+
+
+func IsText(buff []byte) bool {
+	filetype := http.DetectContentType(buff)
+	if strings.HasPrefix(filetype, "text/") {
+		return true
+	}
+	return false
+}

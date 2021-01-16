@@ -10,7 +10,3 @@ func GetVarName(n string) string {
 	n = strings.Title(n)
 	return n
 }
-
-func CurrentPackageNames() (fullName string, name string) {
-	return "", ""
-}
