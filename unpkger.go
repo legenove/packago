@@ -19,20 +19,22 @@ type FileGenInfo struct {
 	HasKV   bool
 }
 
-func Unpackage(out string, kv map[string]interface{}, first bool) error {
+func Unpackage(out string, kv map[string]interface{}, example bool, first bool) error {
 	if kv == nil {
 		kv = map[string]interface{}{}
 	}
 	for f, gi := range FileList {
 		outPath := path.Join(out, f)
-		if !gi.Overide && utils.FileExists(outPath) {
-			continue
+		if !first {
+			if !gi.Overide && utils.FileExists(outPath) {
+				continue
+			}
+			if gi.Example && !example {
+				continue
+			}
 		}
 		lastPath, _ := path.Split(outPath)
 		utils.CreateDir(lastPath)
-		if !gi.Example && !first {
-			continue
-		}
 		content := gi.Content
 		if gi.Base64 {
 			b, err := base64.StdEncoding.DecodeString(content)

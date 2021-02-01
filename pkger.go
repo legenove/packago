@@ -154,12 +154,10 @@ import (
 	"github.com/legenove/packago"
 )
 
-func Unpackage(outPath string, kv map[string]interface{}, first bool) error {
-	return packago.Unpackage(outPath, kv, first)
+func Unpackage(outPath string, kv map[string]interface{}, example, first bool) error {
+	return packago.Unpackage(outPath, kv, example, first)
 }
 `
-
-
 
 func IsText(buff []byte) bool {
 	filetype := http.DetectContentType(buff)
